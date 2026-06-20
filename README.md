@@ -150,25 +150,59 @@ numbers-to-1000/
 
 ## Deployment (Vercel)
 
+All 39 narration lines are already pre-generated as static `.mp3` files in `public/assets/audio/`, and the 6 story illustrations are pre-optimised in `public/assets/images/story/`. **No API key is required for the app to work in production** — narration plays from the static files, and `/api/elevenlabs` is only used as a fallback if you later add new narration lines that haven't been pre-generated yet.
+
+### Option A — Vercel CLI
+
 ```bash
-npm run build
+npm i -g vercel
+vercel
+# follow the prompts, then for production:
+vercel --prod
 ```
 
-Set these environment variables in your Vercel project settings:
+### Option B — Vercel Dashboard (Git-connected)
 
-| Variable | Description |
-|----------|-------------|
-| `VITE_ELEVENLABS_API_KEY` | Client-side key (dynamic fallback) |
-| `ELEVENLABS_API_KEY`      | Server-side key for `/api/elevenlabs` proxy |
+1. Push this project to a GitHub/GitLab/Bitbucket repo.
+2. In Vercel: **Add New Project** → import the repo.
+3. Vercel auto-detects Vite (build command `npm run build`, output dir `dist`) — `vercel.json` in this project also pins this explicitly along with a SPA rewrite rule so client-side routing doesn't 404 on refresh.
+4. Click **Deploy**.
+
+### Environment variables (optional)
+
+Only needed if you plan to add **new** narration lines after deploying and want them generated dynamically at runtime instead of via `npm run generate-audio` locally first:
+
+| Variable | Where | Description |
+|----------|-------|--------------|
+| `ELEVENLABS_API_KEY`      | Vercel → Project → Settings → Environment Variables | Server-side key used by `/api/elevenlabs`. Never exposed to the browser. |
+| `VITE_ELEVENLABS_API_KEY` | Same | Client-side fallback key, only used if the serverless function fails. Optional — omit this if you don't want any client-exposed key. |
+
+### Pre-deploy checklist
+
+- [x] All narration audio pre-generated → `public/assets/audio/*.mp3` (39 files, verified against `audioMap.js`)
+- [x] Story illustrations optimised → `public/assets/images/story/*.webp` (+ `.jpg` fallback), ~110–135 KB each
+- [x] `vercel.json` present with SPA rewrite + asset caching headers
+- [x] No secrets committed (`.env.local` is git-ignored)
+- [x] `npm run build` completes locally before pushing
+
+### Verify the production build locally first
+
+```bash
+npm run build
+npm run preview
+```
+
+Open the printed local URL and confirm: narration plays without lag, the mute button stops audio instantly, and all 6 story images load.
 
 ---
 
 ## Tech Stack
 
 - **React 18** + **Vite 5**
-- **ElevenLabs** text-to-speech (Alice, eleven_multilingual_v2)
-- **Web Audio API** for tone sounds
+- **ElevenLabs** text-to-speech (Alice, eleven_multilingual_v2) — pre-generated to static `.mp3`
+- **Web Audio API** for tone sounds (correct/wrong/badge/streak chimes)
 - **CSS custom properties** for theming (Fredoka + Nunito fonts)
+- WebP illustrations with JPEG fallback via `<picture>`
 - No external UI library dependencies
 
 ---

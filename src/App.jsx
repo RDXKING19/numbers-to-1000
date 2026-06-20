@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import IntroScreen from './components/IntroScreen';
 import WonderPhase from './components/WonderPhase';
 import StoryPhase from './components/StoryPhase';
@@ -6,7 +6,7 @@ import SimulatePhase from './components/SimulatePhase';
 import PlayPhase from './components/PlayPhase';
 import ReflectPhase from './components/ReflectPhase';
 import FloatingNumbers from './components/FloatingNumbers';
-import { stopNarration } from './utils/audio';
+import { stopNarration, setMuted } from './utils/audio';
 
 const PHASES = [
   { id: 'wonder',   label: 'Wonder',   icon: '🔍', num: '01' },
@@ -29,6 +29,13 @@ export default function App() {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [playStats, setPlayStats] = useState(null);
 
+  // Keep the audio engine's global mute flag in sync with audioEnabled.
+  // setMuted(true) immediately halts any in-flight/playing narration —
+  // this is what makes the toggle button actually cut sound right away.
+  useEffect(() => {
+    setMuted(!audioEnabled);
+  }, [audioEnabled]);
+
   const goHome = useCallback(() => {
     stopNarration();
     setPhase('intro');
@@ -46,6 +53,10 @@ export default function App() {
     setPhase('intro');
   }, []);
 
+  const handleToggleAudio = useCallback(() => {
+    setAudioEnabled(a => !a);
+  }, []);
+
   const currentPhaseIndex = PHASES.findIndex(p => p.id === phase);
 
   return (
@@ -55,9 +66,10 @@ export default function App() {
 
         {/* Audio toggle */}
         <button
-          onClick={() => setAudioEnabled(a => !a)}
+          onClick={handleToggleAudio}
           className="audio-toggle-btn"
-          aria-label="Toggle audio"
+          aria-label={audioEnabled ? 'Mute audio' : 'Unmute audio'}
+          aria-pressed={!audioEnabled}
         >
           {audioEnabled ? '🔊' : '🔇'}
         </button>
@@ -91,7 +103,7 @@ export default function App() {
           <IntroScreen
             onStart={() => setPhase('wonder')}
             audioEnabled={audioEnabled}
-            onToggleAudio={() => setAudioEnabled(a => !a)}
+            onToggleAudio={handleToggleAudio}
           />
         )}
         {phase === 'wonder' && (

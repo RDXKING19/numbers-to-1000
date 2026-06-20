@@ -4,19 +4,37 @@
 // No browser TTS fallback. Segment preloading for zero latency.
 // ─────────────────────────────────────────────────────
 
+// Pre-generated static audio map (written by generate_audio.js).
+// Static import — resolved at build time, no async race on first narration call.
+import { audioMap } from './audioMap.js';
+
 let currentQueue = null;
 let currentAudio  = null;
 let playId        = 0;
+let isMuted        = false; // live global mute flag — checked by speak() on every call
 const elevenLabsCache = new Map();
+
+// ─── Global mute control ──────────────────────────────
+// setMuted(true) immediately halts any in-flight or playing narration,
+// and prevents any new narration from starting until unmuted.
+export function setMuted(muted) {
+  isMuted = muted;
+  if (muted) {
+    playId++; // invalidate any in-flight speak() calls
+    currentQueue = null; // invalidate any in-flight narrate() loops
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio = null;
+    }
+  }
+}
+export function getMuted() {
+  return isMuted;
+}
 
 const ELEVENLABS_VOICE_ID = 'Xb7hH8MSUJpSbSDYk0k2'; // Alice
 const ELEVENLABS_MODEL    = 'eleven_multilingual_v2';
-
-// Load pre-generated audioMap if available (written by generate_audio.js)
-let audioMap = {};
-try {
-  import('./audioMap.js').then(m => { audioMap = m.audioMap || {}; }).catch(() => {});
-} catch (_) {}
 
 // Map pedagogical speech styles to ElevenLabs voice settings
 // Optimised for maximum humanisation on eleven_multilingual_v2
@@ -92,12 +110,13 @@ export async function getAudioUrl(text, style = 'statement') {
 // ─── Speak a single segment ──────────────────────────
 export function speak(text, enabled = true, style = 'statement') {
   return new Promise(async (resolve) => {
-    if (!enabled || !text) { resolve(); return; }
+    if (!enabled || isMuted || !text) { resolve(); return; }
     playId++;
     const thisId = playId;
     try {
       const url = await getAudioUrl(text, style);
-      if (thisId !== playId) { resolve(); return; }
+      // Re-check after the async fetch — mute may have been toggled mid-flight
+      if (thisId !== playId || isMuted) { resolve(); return; }
       if (!url) { resolve(); return; }
       if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; }
       currentAudio = new Audio(url);
@@ -144,17 +163,18 @@ export function narrate(segments, enabled = true) {
   };
 
   const promise = (async () => {
-    if (!enabled || !segments?.length) return;
+    if (!enabled || isMuted || !segments?.length) return;
     for (let i = 0; i < segments.length; i++) {
-      if (cancelled || currentQueue !== queueId) return;
+      if (cancelled || isMuted || currentQueue !== queueId) return;
       const s = segments[i];
       // Eagerly preload next segment to eliminate inter-sentence latency
       if (i + 1 < segments.length && segments[i + 1].text) {
         getAudioUrl(segments[i + 1].text, segments[i + 1].style).catch(() => {});
       }
       if (s.text && s.text.trim()) {
-        await speak(s.text, true, s.style);
+        await speak(s.text, enabled, s.style);
       }
+      if (cancelled || isMuted || currentQueue !== queueId) return;
       if (s.pause > 0 && !cancelled && currentQueue === queueId) {
         await new Promise(r => setTimeout(r, s.pause));
       }

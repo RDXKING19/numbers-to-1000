@@ -9,6 +9,8 @@ const STORY_SLIDES = [
     highlight:  '"I use a very clever trick!"',
     mascotText: "Let's help count! 🧶",
     pv:         null,
+    image:      '1',
+    imageAlt:   'Oliver and Asha walk into Grandpa Ben\'s colourful bead shop and greet him at the counter.',
   },
   {
     title:      "Hundreds!",
@@ -16,6 +18,8 @@ const STORY_SLIDES = [
     highlight:  '"Three boxes = three hundreds!"',
     mascotText: 'Each box = 100! 📦',
     pv:         { H: 3, T: 0, O: 0 },
+    image:      '2',
+    imageAlt:   'Grandpa Ben shows Oliver and Asha three boxes, each filled with one hundred beads.',
   },
   {
     title:      "Tens!",
@@ -23,6 +27,8 @@ const STORY_SLIDES = [
     highlight:  '"Four bags = four tens!"',
     mascotText: 'Each bag = 10! 👜',
     pv:         { H: 3, T: 4, O: 0 },
+    image:      '3',
+    imageAlt:   'Grandpa Ben places four small bags of ten beads each next to the boxes of hundreds.',
   },
   {
     title:      "Ones!",
@@ -30,6 +36,8 @@ const STORY_SLIDES = [
     highlight:  '"Three hundred and forty-five! = 345"',
     mascotText: 'Count the ones! 🔢',
     pv:         { H: 3, T: 4, O: 5 },
+    image:      '4',
+    imageAlt:   'Asha counts five loose beads on the counter, one by one.',
   },
   {
     title:      "The Magic of Place Value",
@@ -37,6 +45,8 @@ const STORY_SLIDES = [
     highlight:  '"Place tells you the VALUE!"',
     mascotText: 'Place = value! 💡',
     pv:         { H: 3, T: 4, O: 5 },
+    image:      '5',
+    imageAlt:   'Grandpa Ben explains the place value chart to Oliver and Asha, showing how each digit has its own place.',
   },
   {
     title:      "Count to 1000!",
@@ -44,6 +54,8 @@ const STORY_SLIDES = [
     highlight:  '"Hundreds + Tens + Ones = ONE THOUSAND! 🎉"',
     mascotText: "You've got this! 🚀",
     pv:         null,
+    image:      '6',
+    imageAlt:   'Sparky celebrates with Oliver and Asha, holding up a banner that says ONE THOUSAND.',
   },
 ];
 
@@ -54,10 +66,11 @@ const PV_COLS = [
 ];
 
 export default function StoryPhase({ onComplete, audioEnabled }) {
-  const [slide,   setSlide]   = useState(0);
-  const [anim,    setAnim]    = useState(false);
-  const [textVis, setTextVis] = useState(false);
-  const [hlVis,   setHlVis]   = useState(false);
+  const [slide,     setSlide]     = useState(0);
+  const [anim,      setAnim]      = useState(false);
+  const [textVis,   setTextVis]   = useState(false);
+  const [hlVis,     setHlVis]     = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const narrationRef = useRef(null);
 
   const s      = STORY_SLIDES[slide];
@@ -71,6 +84,20 @@ export default function StoryPhase({ onComplete, audioEnabled }) {
       if (slide + 1 < STORY_SLIDES.length) preloadNarration(getStoryNarration(slide + 1));
     }
   }, [slide, audioEnabled]);
+
+  // Preload next slide's image so the transition feels instant
+  useEffect(() => {
+    const next = STORY_SLIDES[slide + 1];
+    if (next) {
+      const img = new Image();
+      img.src = `/assets/images/story/${next.image}.webp`;
+    }
+  }, [slide]);
+
+  // Reset image-loaded flag whenever the slide changes
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [slide]);
 
   // Stagger text/highlight reveal on slide change
   useEffect(() => {
@@ -115,12 +142,27 @@ export default function StoryPhase({ onComplete, audioEnabled }) {
 
       {/* Slide card */}
       <div className={`story-card ${anim ? 'flipping' : ''}`}>
-        {/* Image placeholder */}
+        {/* Story illustration */}
         <div className="story-image-section">
-          <span style={{ fontSize: '3rem' }}>🖼️</span>
-          <span style={{ fontSize: '0.82rem' }}>
-            [Story Image {slide + 1}: {['Bead shop exterior','Boxes of 100 beads','Bags of 10 beads','Counting single beads','Place value chart','Sparky with 1000 banner'][slide]}]
-          </span>
+          {!imgLoaded && (
+            <div className="story-image-skeleton">
+              <span className="story-image-skeleton-spinner" />
+            </div>
+          )}
+          <picture>
+            <source srcSet={`/assets/images/story/${s.image}.webp`} type="image/webp" />
+            <img
+              key={s.image}
+              src={`/assets/images/story/${s.image}.jpg`}
+              alt={s.imageAlt}
+              className="story-image"
+              style={{ opacity: imgLoaded ? 1 : 0 }}
+              loading={slide === 0 ? 'eager' : 'lazy'}
+              onLoad={() => setImgLoaded(true)}
+              onError={() => setImgLoaded(true)}
+            />
+          </picture>
+          <div className="story-image-overlay" />
         </div>
 
         <div className="story-text-section">
